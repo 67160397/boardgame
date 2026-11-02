@@ -1,0 +1,272 @@
+openapi: 3.0.0
+info:
+  title: Boardgame Store API
+  description: RESTful API สำหรับระบบร้านค้าบอร์ดเกม รองรับสิทธิ์ Admin/User, ตะกร้าสินค้า/สั่งซื้อ, รีวิว และการอัปโหลดรูปภาพ
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:3000
+    description: Local Server
+
+paths:
+  /api/auth/register:
+    post:
+      summary: สมัครสมาชิก
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - email
+                - password
+              properties:
+                name:
+                  type: string
+                email:
+                  type: string
+                password:
+                  type: string
+      responses:
+        '201':
+          description: สมัครสมาชิกสำเร็จ
+
+  /api/auth/login:
+    post:
+      summary: เข้าสู่ระบบ
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                password:
+                  type: string
+      responses:
+        '200':
+          description: เข้าสู่ระบบสำเร็จและได้ JWT Token
+
+  /api/boardgames:
+    get:
+      summary: ดึงรายการบอร์ดเกมทั้งหมด
+      tags:
+        - Boardgames
+      responses:
+        '200':
+          description: สำเร็จ
+    post:
+      summary: เพิ่มบอร์ดเกมใหม่ (เฉพาะ Admin)
+      tags:
+        - Boardgames
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - title
+                - price
+                - min_players
+                - max_players
+              properties:
+                title:
+                  type: string
+                description:
+                  type: string
+                price:
+                  type: number
+                min_players:
+                  type: integer
+                max_players:
+                  type: integer
+                play_time_minutes:
+                  type: integer
+                image_url:
+                  type: string
+      responses:
+        '201':
+          description: เพิ่มสำเร็จ
+
+  /api/boardgames/{id}:
+    put:
+      summary: แก้ไขข้อมูลบอร์ดเกม (เฉพาะ Admin)
+      tags:
+        - Boardgames
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                description:
+                  type: string
+                price:
+                  type: number
+                min_players:
+                  type: integer
+                max_players:
+                  type: integer
+                play_time_minutes:
+                  type: integer
+                image_url:
+                  type: string
+      responses:
+        '200':
+          description: อัปเดตสำเร็จ
+    delete:
+      summary: ลบบอร์ดเกม (เฉพาะ Admin)
+      tags:
+        - Boardgames
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: ลบสำเร็จ
+
+  /api/upload:
+    post:
+      summary: อัปโหลดรูปภาพสินค้าจากเครื่อง (เฉพาะ Admin)
+      tags:
+        - Upload
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                image:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: อัปโหลดสำเร็จ ได้ Path รูปภาพกลับมา
+
+  /api/boardgames/{id}/reviews:
+    get:
+      summary: ดึงรีวิวของบอร์ดเกมตาม ID
+      tags:
+        - Reviews
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: สำเร็จ
+    post:
+      summary: เขียนรีวิวบอร์ดเกม (ต้องล็อกอิน)
+      tags:
+        - Reviews
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - rating
+              properties:
+                rating:
+                  type: integer
+                  minimum: 1
+                  maximum: 5
+                comment:
+                  type: string
+      responses:
+        '201':
+          description: บันทึกรีวิวสำเร็จ
+
+  /api/orders:
+    post:
+      summary: ส่งคำสั่งซื้อสินค้า / ชำระเงิน (ต้องล็อกอิน)
+      tags:
+        - Orders
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - items
+                - total_amount
+              properties:
+                total_amount:
+                  type: number
+                items:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      quantity:
+                        type: integer
+                      price:
+                        type: number
+      responses:
+        '201':
+          description: สั่งซื้อสำเร็จ
+
+  /api/exchange-rate:
+    get:
+      summary: ดึงอัตราแลกเปลี่ยนเงินบาท/ดอลลาร์
+      tags:
+        - External API
+      responses:
+        '200':
+          description: สำเร็จ
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Boardgame Store & E-Commerce</title>
+  <style>
+    :root {
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --success: #16a34a;
+      --danger: #ef4444;
+      --bg: #f8fafc;
+      --border: #e2e8f0;
+    }
+    * { box-sizing: border-box; font-family: 'Sarabun', system-ui, sans-serif; }
+    body { background-color: var(--bg); color: #0f172a; margin: 0; padding: 20px; }
+    .container { max-width: 1080px; margin: 0 auto; }
+    
+    .nav-bar {
+      display: flex; justify-content: space-between; align-items: center;
+      background: white; padding: 16px 24px; border-radius: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08); margin-bottom: 20px;
+    }
+    .brand { font-size: 1.4rem; font-weight: bold; color: var(--primary); }
+    .user-controls { display: flex; align-items: center; gap: 10px; }
+    
+    button {
+      background-color: var(--primary); color: white; border: none;
+      padding: 8px 14px; border-radius: 6px; font-weight: 600; cursor: pointer;
+      transition: all 0.2s; font-size: 0.9rem;
+    }
+    button:hover { opacity: 0.9; }
+    button.btn-secondary { background-color: #64748b; }
+    button.btn-danger { background-color: var(--danger); }
+    button.btn-success { background-color: var(--success); }
+    .btn-sm { padding: 4px 10px; font-size: 0.8rem; }
+    
+    .currency-toggle { display: flex; background: #e2e8f0; border-radius: 20px; padding: 2px; }
+    .currency-btn { background: transparent; color: #475569; padding: 4px 12px; border-radius: 16px; font-size: 0.85rem; }
+    .currency-btn.active { background: var(--primary); color: white; }
+
+    .cart-badge { background: var(--danger); color: white; border-radius: 50%; padding: 2px 7px; font-size: 0.75rem; margin-left: 4px; }
+
+    .card { background: white; padding: 20px; border-radius: 12px; border: 1px solid var(--border); margin-bottom: 20px; }
+    .game-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
+    .game-card {
+      background: white; border-radius: 12px; border: 1px solid var(--border);
+      overflow: hidden; display: flex; flex-direction: column; justify-content: space-between;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+    }
+    .game-img { width: 100%; height: 180px; object-fit: cover; background-color: #cbd5e1; }
+    .game-body { padding: 16px; flex-grow: 1; }
+    .game-title { font-size: 1.2rem; font-weight: bold; margin-bottom: 4px; }
+    .game-price { font-size: 1.25rem; font-weight: bold; color: var(--primary); margin: 8px 0; }
+    .game-meta { font-size: 0.85rem; color: #64748b; margin-bottom: 8px; }
+    .game-actions { padding: 12px 16px; background: #f8fafc; border-top: 1px solid var(--border); display: flex; gap: 6px; flex-wrap: wrap; }
+
+    .modal-overlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center; z-index: 1000;
+    }
+    .modal { background: white; padding: 24px; border-radius: 12px; width: 90%; max-width: 500px; max-height: 90vh; overflow-y: auto; }
+    .form-group { margin-bottom: 12px; }
+    label { display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 4px; }
+    input, textarea, select { width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; }
+
+    .cart-item { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); padding: 10px 0; }
+    .cart-item-img { width: 50px; height: 50px; object-fit: cover; border-radius: 6px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="nav-bar">
+      <div class="brand">🎲 Board Game Store</div>
+      <div class="user-controls">
+        <div class="currency-toggle">
+          <button id="btn-thb" class="currency-btn active" onclick="setCurrency('THB')">THB (฿)</button>
+          <button id="btn-usd" class="currency-btn" onclick="setCurrency('USD')">USD ($)</button>
+        </div>
+        <button class="btn-success btn-sm" onclick="openCartModal()">🛒 ตะกร้า <span id="cart-count" class="cart-badge">0</span></button>
+        <div id="auth-controls"></div>
+      </div>
+    </div>
+
+    <!-- Admin Panel -->
+    <div id="admin-panel" class="card" style="display: none;">
+      <h2 id="admin-form-title">➕ เพิ่ม/แก้ไข บอร์ดเกม (สิทธิ์ Admin)</h2>
+      <form id="game-form">
+        <input type="hidden" id="game-id" />
+        <input type="hidden" id="existing_image_url" />
+        
+        <div class="form-group">
+          <label>ชื่อเกม *</label>
+          <input type="text" id="title" required placeholder="เช่น Catan" />
+        </div>
+        <div class="form-group">
+          <label>รายละเอียด</label>
+          <textarea id="description" rows="2"></textarea>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
+          <div class="form-group">
+            <label>ราคา (บาท THB) *</label>
+            <input type="number" step="0.01" id="price" required placeholder="1250" />
+          </div>
+          <div class="form-group">
+            <label>ผู้เล่นต่ำสุด *</label>
+            <input type="number" id="min_players" value="2" required />
+          </div>
+          <div class="form-group">
+            <label>ผู้เล่นสูงสุด *</label>
+            <input type="number" id="max_players" value="4" required />
+          </div>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div class="form-group">
+            <label>เวลาเล่น (นาที)</label>
+            <input type="number" id="play_time_minutes" value="60" />
+          </div>
+          <div class="form-group">
+            <label>📁 เลือกอัปโหลดรูปภาพ</label>
+            <input type="file" id="image_file" accept="image/*" onchange="previewSelectedFile(event)" />
+          </div>
+        </div>
+        <div style="margin-bottom: 12px;">
+          <label>ตัวอย่างรูปภาพ:</label><br />
+          <img id="image-preview" src="https://via.placeholder.com/150?text=No+Image" style="max-height: 120px; border-radius: 8px; border: 1px solid var(--border);" />
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <button type="submit" id="btn-save-game">บันทึกข้อมูล</button>
+          <button type="button" id="btn-cancel-game" class="btn-secondary" style="display: none;" onclick="resetAdminForm()">ยกเลิก</button>
+        </div>
+      </form>
+    </div>
+
+    <h2>📚 รายการบอร์ดเกม</h2>
+    <div id="game-list" class="game-grid">กำลังโหลดสินค้า...</div>
+  </div>
+
+  <!-- Cart Modal -->
+  <div id="cart-modal" class="modal-overlay">
+    <div class="modal">
+      <h3>🛒 ตะกร้าสินค้าของคุณ</h3>
+      <div id="cart-items-list" style="margin: 15px 0;"></div>
+      <div style="font-size: 1.1rem; font-weight: bold; text-align: right; margin-bottom: 15px;">
+        ยอดรวมทั้งหมด: <span id="cart-total-price" style="color: var(--primary);">฿0 THB</span>
+      </div>
+      <div style="display: flex; justify-content: space-between;">
+        <button class="btn-secondary" onclick="closeCartModal()">ปิด</button>
+        <button class="btn-success" onclick="checkoutCart()">🛍️ ชำระเงิน / สั่งซื้อ</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Auth Modal -->
+  <div id="auth-modal" class="modal-overlay">
+    <div class="modal">
+      <h3 id="modal-title">เข้าสู่ระบบ</h3>
+      <form id="auth-form">
+        <div class="form-group" id="group-name" style="display: none;">
+          <label>ชื่อ-นามสกุล</label>
+          <input type="text" id="auth-name" placeholder="Your Name" />
+        </div>
+        <div class="form-group">
+          <label>อีเมล</label>
+          <input type="email" id="auth-email" required placeholder="your@email.com" />
+        </div>
+        <div class="form-group">
+          <label>รหัสผ่าน</label>
+          <input type="password" id="auth-password" required placeholder="••••••" />
+        </div>
+        <div id="auth-error" style="color: red; font-size: 0.85rem; margin-bottom: 8px;"></div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 16px;">
+          <button type="submit" id="btn-auth-submit">เข้าสู่ระบบ</button>
+          <button type="button" class="btn-secondary" onclick="closeAuthModal()">ปิด</button>
+        </div>
+        <div style="margin-top: 12px; font-size: 0.85rem; text-align: center;">
+          <a href="#" id="auth-toggle-link" onclick="toggleAuthMode(event)">ยังไม่มีบัญชี? สมัครสมาชิก</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Review Modal -->
+  <div id="review-modal" class="modal-overlay">
+    <div class="modal">
+      <h3 id="review-game-title">รีวิวสินค้า</h3>
+      <div id="reviews-container" style="max-height: 200px; overflow-y: auto; margin-bottom: 16px;"></div>
+      <div id="add-review-section">
+        <h4>✍️ เขียนรีวิวของคุณ</h4>
+        <form id="review-form">
+          <input type="hidden" id="review-game-id" />
+          <div class="form-group">
+            <label>ให้คะแนน (ดาว)</label>
+            <select id="review-rating" required>
+              <option value="5">⭐⭐⭐⭐⭐ (5 ดาว - ดีมาก)</option>
+              <option value="4">⭐⭐⭐⭐ (4 ดาว - ดี)</option>
+              <option value="3">⭐⭐⭐ (3 ดาว - ปานกลาง)</option>
+              <option value="2">⭐⭐ (2 ดาว - พอใช้)</option>
+              <option value="1">⭐ (1 ดาว - ควรปรับปรุง)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>ความคิดเห็น</label>
+            <textarea id="review-comment" rows="2" placeholder="แชร์ความรู้สึกหลังเล่น..."></textarea>
+          </div>
+          <button type="submit" class="btn-success">ส่งรีวิว</button>
+        </form>
+      </div>
+      <div style="text-align: right; margin-top: 12px;">
+        <button type="button" class="btn-secondary" onclick="closeReviewModal()">ปิด</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentCurrency = 'THB';
+    let exchangeRate = 35.5;
+    let currentUser = JSON.parse(localStorage.getItem('user')) || null;
+    let authToken = localStorage.getItem('token') || null;
+    let cart = JSON.parse(localStorage.getItem('cart')) || [];
+    let isRegisterMode = false;
+    let loadedGames = [];
+
+    async function init() {
+      await fetchExchangeRate();
+      renderAuthControls();
+      updateCartBadge();
+      loadGames();
+    }
+
+    async function fetchExchangeRate() {
+      try {
+        const res = await fetch('/api/exchange-rate');
+        const data = await res.json();
+        if (data.thb_rate) exchangeRate = data.thb_rate;
+      } catch (e) { console.error(e); }
+    }
+
+    function renderAuthControls() {
+      const container = document.getElementById('auth-controls');
+      const adminPanel = document.getElementById('admin-panel');
+
+      if (currentUser) {
+        container.innerHTML = `
+          <span style="font-size: 0.85rem;">👋 <strong>${currentUser.name}</strong> (${currentUser.role})</span>
+          <button onclick="logout()" class="btn-secondary btn-sm">ออกจากระบบ</button>
+        `;
+        adminPanel.style.display = currentUser.role === 'admin' ? 'block' : 'none';
+      } else {
+        container.innerHTML = `
+          <button onclick="openAuthModal('login')" class="btn-sm">เข้าสู่ระบบ</button>
+          <button onclick="openAuthModal('register')" class="btn-secondary btn-sm">สมัครสมาชิก</button>
+        `;
+        adminPanel.style.display = 'none';
+      }
+    }
+
+    function setCurrency(currency) {
+      currentCurrency = currency;
+      document.getElementById('btn-thb').className = `currency-btn ${currency === 'THB' ? 'active' : ''}`;
+      document.getElementById('btn-usd').className = `currency-btn ${currency === 'USD' ? 'active' : ''}`;
+      loadGames();
+      renderCartItems();
+    }
+
+    function formatPrice(priceInTHB) {
+      const numericPrice = Number(priceInTHB) || 0;
+      if (currentCurrency === 'USD') {
+        return `$${(numericPrice / exchangeRate).toFixed(2)} USD`;
+      }
+      return `฿${numericPrice.toLocaleString()} THB`;
+    }
+
+    async function loadGames() {
+      const listEl = document.getElementById('game-list');
+      try {
+        const res = await fetch('/api/boardgames');
+        const data = await res.json();
+        loadedGames = data.data || [];
+
+        if (loadedGames.length === 0) {
+          listEl.innerHTML = '<p>ไม่มีสินค้าในขณะนี้</p>';
+          return;
+        }
+
+        listEl.innerHTML = loadedGames.map(game => `
+          <div class="game-card">
+            <img src="${game.image_url || 'https://via.placeholder.com/300'}" class="game-img" alt="${game.title}" />
+            <div class="game-body">
+              <div class="game-title">${game.title}</div>
+              <div class="game-meta">👥 ${game.min_players}-${game.max_players} คน | ⏱️ ${game.play_time_minutes} นาที</div>
+              <p style="font-size: 0.85rem; color: #475569; margin: 4px 0;">${game.description || ''}</p>
+              <div class="game-price">${formatPrice(game.price)}</div>
+              <div style="font-size: 0.85rem; color: #d97706;">⭐ ${game.average_rating} (${game.total_reviews} รีวิว)</div>
+            </div>
+            <div class="game-actions">
+              <button class="btn-sm btn-success" onclick="addToCart(${game.id})">🛒 ใส่ตะกร้า</button>
+              <button class="btn-sm btn-secondary" onclick="openReviewModal(${game.id}, '${escapeQuote(game.title)}')">💬 รีวิว</button>
+              ${currentUser && currentUser.role === 'admin' ? `
+                <button class="btn-sm" onclick="editGame(${JSON.stringify(game).replace(/"/g, '&quot;')})">✏️ แก้ไข</button>
+                <button class="btn-sm btn-danger" onclick="deleteGame(${game.id})">🗑️ ลบ</button>
+              ` : ''}
+            </div>
+          </div>
+        `).join('');
+      } catch (err) {
+        listEl.innerHTML = `<p style="color:red">เกิดข้อผิดพลาด: ${err.message}</p>`;
+      }
+    }
+
+    // --- CART SYSTEM ---
+    function addToCart(gameId) {
+      const game = loadedGames.find(g => g.id === gameId);
+      if (!game) return;
+
+      const existing = cart.find(i => i.id === gameId);
+      if (existing) { existing.quantity += 1; }
+      else { cart.push({ id: game.id, title: game.title, price: game.price, image_url: game.image_url, quantity: 1 }); }
+
+      saveCart();
+      alert(`เพิ่ม "${game.title}" ลงตะกร้าเรียบร้อยแล้ว!`);
+    }
+
+    function saveCart() {
+      localStorage.setItem('cart', JSON.stringify(cart));
+      updateCartBadge();
+    }
+
+    function updateCartBadge() {
+      document.getElementById('cart-count').textContent = cart.reduce((s, i) => s + i.quantity, 0);
+    }
+
+    function openCartModal() {
+      renderCartItems();
+      document.getElementById('cart-modal').style.display = 'flex';
+    }
+    function closeCartModal() { document.getElementById('cart-modal').style.display = 'none'; }
+
+    function renderCartItems() {
+      const container = document.getElementById('cart-items-list');
+      const totalEl = document.getElementById('cart-total-price');
+
+      if (cart.length === 0) {
+        container.innerHTML = '<p style="color:#64748b;">ไม่มีสินค้าในตะกร้า</p>';
+        totalEl.textContent = formatPrice(0);
+        return;
+      }
+
+      let total = 0;
+      container.innerHTML = cart.map(item => {
+        total += item.price * item.quantity;
+        return `
+          <div class="cart-item">
+            <img src="${item.image_url || 'https://via.placeholder.com/50'}" class="cart-item-img" />
+            <div style="flex-grow:1; margin-left: 10px;">
+              <strong>${item.title}</strong>
+              <div style="font-size:0.85rem; color:#64748b;">${formatPrice(item.price)} x ${item.quantity}</div>
+            </div>
+            <div style="display:flex; align-items:center; gap:5px;">
+              <button class="btn-sm btn-secondary" onclick="updateQty(${item.id}, -1)">-</button>
+              <span>${item.quantity}</span>
+              <button class="btn-sm btn-secondary" onclick="updateQty(${item.id}, 1)">+</button>
+              <button class="btn-sm btn-danger" onclick="removeFromCart(${item.id})">❌</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      totalEl.textContent = formatPrice(total);
+    }
+
+    function updateQty(id, delta) {
+      const item = cart.find(i => i.id === id);
+      if (!item) return;
+      item.quantity += delta;
+      if (item.quantity <= 0) cart = cart.filter(i => i.id !== id);
+      saveCart();
+      renderCartItems();
+    }
+
+    function removeFromCart(id) {
+      cart = cart.filter(i => i.id !== id);
+      saveCart();
+      renderCartItems();
+    }
+
+    async function checkoutCart() {
+      if (!currentUser) {
+        alert('กรุณาเข้าสู่ระบบก่อนทำการสั่งซื้อ');
+        closeCartModal();
+        openAuthModal('login');
+        return;
+      }
+      if (cart.length === 0) return alert('ไม่มีสินค้าในตะกร้า');
+
+      const totalTHB = cart.reduce((s, i) => s + (i.price * i.quantity), 0);
+
+      try {
+        const res = await fetch('/api/orders', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({ items: cart, total_amount: totalTHB })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message);
+
+        alert('🎉 สั่งซื้อสินค้าสำเร็จ!');
+        cart = [];
+        saveCart();
+        closeCartModal();
+      } catch (err) { alert(err.message); }
+    }
+
+    // --- ADMIN FILE UPLOAD & FORM ---
+    function previewSelectedFile(e) {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (evt) => { document.getElementById('image-preview').src = evt.target.result; };
+        reader.readAsDataURL(file);
+      }
+    }
+
+    function editGame(game) {
+      document.getElementById('game-id').value = game.id;
+      document.getElementById('existing_image_url').value = game.image_url || '';
+      document.getElementById('title').value = game.title;
+      document.getElementById('description').value = game.description || '';
+      document.getElementById('price').value = game.price;
+      document.getElementById('min_players').value = game.min_players;
+      document.getElementById('max_players').value = game.max_players;
+      document.getElementById('play_time_minutes').value = game.play_time_minutes;
+      
+      document.getElementById('image-preview').src = game.image_url || 'https://via.placeholder.com/150?text=No+Image';
+
+      document.getElementById('admin-form-title').textContent = '✏️ แก้ไขข้อมูลบอร์ดเกม';
+      document.getElementById('btn-save-game').textContent = 'อัปเดตข้อมูล';
+      document.getElementById('btn-cancel-game').style.display = 'inline-block';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function resetAdminForm() {
+      document.getElementById('game-id').value = '';
+      document.getElementById('existing_image_url').value = '';
+      document.getElementById('game-form').reset();
+      document.getElementById('image_file').value = '';
+      document.getElementById('image-preview').src = 'https://via.placeholder.com/150?text=No+Image';
+      document.getElementById('admin-form-title').textContent = '➕ เพิ่ม/แก้ไข บอร์ดเกม (สิทธิ์ Admin)';
+      document.getElementById('btn-save-game').textContent = 'บันทึกข้อมูล';
+      document.getElementById('btn-cancel-game').style.display = 'none';
+    }
+
+    document.getElementById('game-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const id = document.getElementById('game-id').value;
+      const title = document.getElementById('title').value;
+      const description = document.getElementById('description').value;
+      const price = parseFloat(document.getElementById('price').value);
+      const min_players = parseInt(document.getElementById('min_players').value);
+      const max_players = parseInt(document.getElementById('max_players').value);
+      const play_time_minutes = parseInt(document.getElementById('play_time_minutes').value);
+      
+      let image_url = document.getElementById('existing_image_url').value;
+      const fileInput = document.getElementById('image_file');
+
+      try {
+        // อัปโหลดไฟล์รูปใหม่ (ถ้ามีการเลือกไฟล์)
+        if (fileInput.files.length > 0) {
+          const formData = new FormData();
+          formData.append('image', fileInput.files[0]);
+
+          const uploadRes = await fetch('/api/upload', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${authToken}` },
+            body: formData
+          });
+          const uploadData = await uploadRes.json();
+          if (!uploadRes.ok) throw new Error(uploadData.message);
+
+          image_url = uploadData.imageUrl;
+        }
+
+        // กรณีเพิ่มเกมใหม่แล้วไม่ได้เลือกรูป ให้ใช้รูป Default
+        if (!image_url) {
+          image_url = 'https://images.unsplash.com/photo-1610890716171-6b1bb98ffd09?w=500';
+        }
+
+        const isEdit = Boolean(id);
+        const url = isEdit ? `/api/boardgames/${id}` : '/api/boardgames';
+        const method = isEdit ? 'PUT' : 'POST';
+
+        const res = await fetch(url, {
+          method,
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+          body: JSON.stringify({ title, description, price, min_players, max_players, play_time_minutes, image_url })
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message);
+
+        alert(isEdit ? 'อัปเดตข้อมูลสำเร็จ' : 'เพิ่มบอร์ดเกมสำเร็จ');
+        resetAdminForm();
+        loadGames();
+      } catch (err) { alert(err.message); }
+    });
+
+    async function deleteGame(id) {
+      if (!confirm('ยืนยันลบบอร์ดเกมนี้?')) return;
+      try {
+        const res = await fetch(`/api/boardgames/${id}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message);
+        loadGames();
+      } catch (err) { alert(err.message); }
+    }
+
+    // --- AUTH & REVIEWS ---
+    function openAuthModal(mode) {
+      isRegisterMode = mode === 'register';
+      document.getElementById('modal-title').textContent = isRegisterMode ? 'สมัครสมาชิก' : 'เข้าสู่ระบบ';
+      document.getElementById('group-name').style.display = isRegisterMode ? 'block' : 'none';
+      document.getElementById('btn-auth-submit').textContent = isRegisterMode ? 'ลงทะเบียน' : 'เข้าสู่ระบบ';
+      document.getElementById('auth-toggle-link').textContent = isRegisterMode ? 'มีบัญชีอยู่แล้ว? เข้าสู่ระบบ' : 'ยังไม่มีบัญชี? สมัครสมาชิก';
+      document.getElementById('auth-error').textContent = '';
+      document.getElementById('auth-modal').style.display = 'flex';
+    }
+    function closeAuthModal() { document.getElementById('auth-modal').style.display = 'none'; }
+    function toggleAuthMode(e) { e.preventDefault(); openAuthModal(isRegisterMode ? 'login' : 'register'); }
+
+    document.getElementById('auth-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('auth-email').value;
+      const password = document.getElementById('auth-password').value;
+      const name = document.getElementById('auth-name').value;
+
+      const url = isRegisterMode ? '/api/auth/register' : '/api/auth/login';
+      const body = isRegisterMode ? { name, email, password } : { email, password };
+
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message);
+
+        if (isRegisterMode) {
+          alert('สมัครสมาชิกสำเร็จ!');
+          openAuthModal('login');
+        } else {
+          localStorage.setItem('token', data.token);
+          localStorage.setItem('user', JSON.stringify(data.user));
+          authToken = data.token;
+          currentUser = data.user;
+          closeAuthModal();
+          renderAuthControls();
+          loadGames();
+        }
+      } catch (err) { document.getElementById('auth-error').textContent = err.message; }
+    });
+
+    function logout() {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      authToken = null;
+      currentUser = null;
+      renderAuthControls();
+      loadGames();
+    }
+
+    async function openReviewModal(gameId, title) {
+      document.getElementById('review-game-id').value = gameId;
+      document.getElementById('review-game-title').textContent = `รีวิว: ${title}`;
+      document.getElementById('review-modal').style.display = 'flex';
+      document.getElementById('add-review-section').style.display = currentUser ? 'block' : 'none';
+      fetchReviews(gameId);
+    }
+    function closeReviewModal() { document.getElementById('review-modal').style.display = 'none'; }
+
+    async function fetchReviews(gameId) {
+      const container = document.getElementById('reviews-container');
+      container.innerHTML = 'กำลังโหลดรีวิว...';
+      try {
+        const res = await fetch(`/api/boardgames/${gameId}/reviews`);
+        const data = await res.json();
+        const reviews = data.data || [];
+        if (reviews.length === 0) {
+          container.innerHTML = '<p style="color:#64748b;">ยังไม่มีรีวิวสำหรับเกมนี้</p>';
+          return;
+        }
+        container.innerHTML = reviews.map(r => `
+          <div style="border-bottom:1px solid var(--border); padding:6px 0;">
+            <strong>${escapeHtml(r.user_name)}</strong> <span style="color:#d97706;">${'⭐'.repeat(r.rating)}</span>
+            <p style="margin:2px 0; font-size:0.9rem;">${escapeHtml(r.comment || '')}</p>
+          </div>
+        `).join('');
+      } catch (err) { container.innerHTML = 'ไม่สามารถโหลดรีวิวได้'; }
+    }
+
+    document.getElementById('review-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const gameId = document.getElementById('review-game-id').value;
+      const rating = document.getElementById('review-rating').value;
+      const comment = document.getElementById('review-comment').value;
+
+      try {
+        const res = await fetch(`/api/boardgames/${gameId}/reviews`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+          body: JSON.stringify({ rating: parseInt(rating), comment })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message);
+
+        document.getElementById('review-comment').value = '';
+        fetchReviews(gameId);
+        loadGames();
+      } catch (err) { alert(err.message); }
+    });
+
+    function escapeQuote(str) { return str.replace(/'/g, "\\'"); }
+    function escapeHtml(str) { return str.replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m])); }
+
+    init();
+  </script>
+</body>
+</html>
